@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gemini Chatbot</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <link rel="icon" type="image/x-icon" href="/favicon.ico"> <!-- Thêm favicon, tạo file nếu cần -->
+    <style>
+        #root {
+            max-width: 600px;
+            margin: 20px auto;
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
+
+        function Chatbot() {
+            const [messages, setMessages] = useState([]);
+            const [input, setInput] = useState("");
+            const [isLoading, setIsLoading] = useState(false);
+            const chatEndRef = useRef(null);
+
+            const API_KEY = "AIzaSyBl_whL0E3xDlH3pwIG4VIplSDkpjaG4ck"; // Thay bằng API Key hợp lệ từ Google AI Studio
+            const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${API_KEY}`;
+
+            const scrollToBottom = () => {
+                chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+            };
+
+            useEffect(() => {
+                scrollToBottom();
+            }, [messages]);
+
+            const handleSend = async () => {
+                if (!input.trim() || isLoading) return;
+
+                const userMessage = { text: input, sender: "user" };
+                setMessages((prev) => [...prev, userMessage]);
+                setInput("");
+                setIsLoading(true);
+
+                try {
+                    const response = await fetch(API_URL, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                            contents: [{ parts: [{ text: input }] }],
+                        }),
+                    });
+
+                    if (!response.ok) {
+                        const errorText = await response.text();
+                        throw new Error(`API Error: ${response.status} - ${errorText}`);
+                    }
+
+                    const data = await response.json();
+                    const botMessage = {
+                        text: data.candidates[0].content.parts[0].text,
+                        sender: "bot",
+                    };
+                    setMessages((prev) => [...prev, botMessage]);
+                } catch (error) {
+                    console.error("Lỗi chi tiết:", error);
+                    setMessages((prev) => [
+                        ...prev,
+                        { text: `Lỗi: ${error.message}. Vui lòng kiểm tra API Key hoặc kết nối.`, sender: "bot" },
+                    ]);
+                } finally {
+                    setIsLoading(false);
+                }
+            };
+
+            return (
+                <div className="bg-white p-4 rounded-lg shadow-lg">
+                    <h1 className="text-2xl font-bold text-center mb-4 text-gray-800">Gemini Chatbot</h1>
+                    <div className="h-96 overflow-y-auto border border-gray-300 p-2 mb-4 bg-gray-50 rounded">
+                        {messages.map((msg, index) => (
+                            <div
+                                key={index}
+                                className={`mb-2 p-2 rounded-lg ${
+                                    msg.sender === "user"
+                                        ? "bg-blue-500 text-white ml-auto"
+                                        : "bg-gray-200 text-gray-800"
+                                } max-w-xs`}
+                            >
+                                {msg.text}
+                            </div>
+                        ))}
+                        <div ref={chatEndRef} />
+                    </div>
+                    <div className="flex gap-2">
+                        <input
+                            type="text"
+                            value={input}
+                            onChange={(e) => setInput(e.target.value)}
+                            placeholder="Nhập tin nhắn..."
+                            className="flex-1 p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            disabled={isLoading}
+                        />
+                        <button
+                            onClick={handleSend}
+                            className="bg-green-500 text-white p-2 rounded-lg hover:bg-green-600 disabled:bg-gray-400"
+                            disabled={isLoading}
+                        >
+                            {isLoading ? "Đang xử lý..." : "Gửi"}
+                        </button>
+                    </div>
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById("root"));
+        root.render(<Chatbot />);
+    </script>
